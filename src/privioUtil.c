@@ -32,14 +32,45 @@ int privioGetConfig(const char *path, config_t *cfg){
   return 0;
 }
 
-int privioPathValidator(const char *path, config_t *conf){
+int privioPathValidator(privioArgs paths, int path_count, config_t *conf){
   /* TODO: Store regex for valid paths in cwa_plugin_settings
    * connect via active record library, use regex to validate
    * path
    */
 
-
+  char *pathreg;
+  const config_setting_t *allowed_paths;
+  regex_t *regs = NULL;
+  int reg_count;
+  int i,j,k;
   
+  allowed_paths = config_lookup(conf, "privio.allowed_paths");
+  if (config_setting_type(allowed_paths) != CONFIG_TYPE_ARRAY){
+    fprintf(stderr, "privio.allowed_paths is not defined as an array!  Failed...");
+    return 0;
+  }
+
+  reg_count = config_setting_length(allowed_paths);
+
+  /* Grab and compile our regular expressions */
+  for (j = 0; j < reg_count; j++){
+    regs = realloc(regs, (j+1)*sizeof(regex_t));
+    pathreg = (char*)config_setting_get_string_elem(allowed_paths, j);
+    if(regcomp(&regs[j], pathreg, REG_EXTENDED|REG_NOSUB)){
+      fprintf(stderr, "Invalid regular expression, %s\n", pathreg);
+      return 0;
+    }
+  }
+
+  /* Match against the compiled regular expressions */
+  for (i = 0; i < j; i++){
+    for (k = 0; k <= path_count; k++){
+      fprintf(stderr, "Compare %s to %s\n", config_setting_get_string_elem(allowed_paths, i), paths[k]);
+      if(!regexec(&regs[i], paths[k], strlen(paths[k]), NULL, 0))
+        return 1;
+    }
+  }
+
   return 0;  
 }
 

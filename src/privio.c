@@ -73,19 +73,19 @@ int main(int argc, char **argv){
     }
   }
 
-  /* Validate path for each path argument */
-  for (i=0; i <= j; i++){
-    if (!privioPathValidator(arguments[i], &conf)){
-      fprintf(stderr, "\"%s\" is an invalid path.  Aborting...\n", arguments[i]);
-      return -2;
-    }
+  /* Validate path arguments */
+  fprintf(stderr, "%d\n", j);
+  if (!privioPathValidator(arguments, j+1, &conf)){
+    fprintf(stderr, "Invalid path argument specified!\n");
+    return -2;
   }
 
   /* Get function call based on cmd passed in command args */
-  f2call = getOpFromCommand(argv[1]);
+/*  f2call = getOpFromCommand(argv[1]); */
 
   /* Call it! */
-  return (*f2call)(arguments);
+/*  return (*f2call)(arguments); */
+  return 0;
 }
 
 /*
