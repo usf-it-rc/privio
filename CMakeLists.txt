@@ -3,6 +3,7 @@ project (privio)
 
 set (PRIVIO_VERSION_MAJOR 0)
 set (PRIVIO_VERSION_MINOR 1)
+set (CFLAGS -g)
 
 configure_file (
   "${PROJECT_SOURCE_DIR}/privioConfig.h.in"

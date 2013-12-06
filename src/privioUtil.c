@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "privio.h"
 
-int privioGetConfig(const char *path, config_t *cfg){
+int privioGetConfig(config_t *cfg){
   FILE *fp;
 
   fp = fopen(PRIVIO_CONFIG_PATH, "r");
@@ -111,3 +111,10 @@ void *getOpFromCommand(const char *cmd){
 
   return fpointer;
 }
+
+int privio_debug(conf_t *cfg, const char *fmt, ...){
+  va_list arg_list;
+  va_start(arg_list, fmt);
+
+   
+
