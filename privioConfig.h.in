@@ -5,4 +5,4 @@
 #define PRIVIO_MAX_OPERANDS 8
 #define PRIVIO_MAX_OPERAND_LENGTH 0x100000
 
-#define PRIVIO_CONFIG_PATH "privio.conf"
+#define PRIVIO_CONFIG_PATH "../privio.conf"

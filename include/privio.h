@@ -25,24 +25,24 @@
 #include <privioConfig.h>
 #include <libconfig.h>
 
-typedef char privioArgs[PRIVIO_MAX_OPERANDS][PRIVIO_MAX_OPERAND_LENGTH];
-typedef int (* privioFunction)(config_t *, privioArgs *);
+typedef int (* privioFunction)(config_t *);
 
 /* top-level functions */
-int privio_writer(config_t *, privioArgs *);
-int privio_reader(config_t *, privioArgs *);
-int privio_mkdir(config_t *, privioArgs *);
-int privio_rename(config_t *, privioArgs *);
-int privio_zip(config_t *, privioArgs *);
-int privio_mv(config_t *, privioArgs *);
-int privio_lines(config_t *, privioArgs *);
-int privio_type(config_t *, privioArgs *);
-int privio_list(config_t *, privioArgs *);
-int privio_tail(config_t *, privioArgs *);
+int privio_writer(config_t *);
+int privio_reader(config_t *);
+int privio_mkdir(config_t *);
+int privio_rename(config_t *);
+int privio_zip(config_t *);
+int privio_mv(config_t *);
+int privio_lines(config_t *);
+int privio_type(config_t *);
+int privio_list(config_t *);
+int privio_tail(config_t *);
 
 /* utility functions */
 int privioGetConfig(config_t *);
-int privioPathValidator(config_t *, privioArgs, int);
+int privioPathValidator(config_t *, char *);
+char **privioReadPaths(config_t *, int);
 unsigned int cmdHash(const char *);
 privioFunction getOpFromCommand(config_t *, const char *);
 void privio_debug(config_t *, int, const char *, ...);

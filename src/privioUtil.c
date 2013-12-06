@@ -32,6 +32,11 @@ int privioUserSwitch(config_t *cfg, const char *uid){
 
   switch_user = getpwnam(uid);
 
+  if (switch_user == NULL){
+    privio_debug(cfg, DBG_ERROR, "User to switch, %s, does not exist!\n", uid);
+    return -1; 
+  }
+
   /* Make sure our executing user is in the allowed_users list */
   allowed_users = config_lookup(cfg, "privio.allowed_users");
   allowed_count = config_setting_length(allowed_users);
@@ -66,15 +71,10 @@ int privioUserSwitch(config_t *cfg, const char *uid){
     return -1;
   }
 
-  if (user == NULL){
-    privio_debug(cfg, DBG_ERROR, "User to switch, %s, does not exist!\n", uid);
-    return -1; 
-  } else {
-    status = setuid(switch_user->pw_uid);
-    if (status < 0){
-      privio_debug(cfg, DBG_ERROR, "Couldn't setuid to \"%s\"!\n", switch_user->pw_name);
-      return -1;
-    }
+  status = setuid(switch_user->pw_uid);
+  if (status < 0){
+    privio_debug(cfg, DBG_ERROR, "Couldn't setuid to \"%s\"!\n", switch_user->pw_name);
+    return -1;
   }
   return 0;
 }
@@ -101,17 +101,17 @@ int privioGetConfig(config_t *cfg){
 
 /* Snag regexes from privio.allowed_paths and ensure that our operands 
  * passed on the command line match at least one of these expressions */
-int privioPathValidator(config_t *cfg, privioArgs paths, int path_count){
+int privioPathValidator(config_t *cfg, char *path){
 
   char *pathreg;
   const config_setting_t *allowed_paths;
   regex_t *regs = NULL;
   int reg_count;
-  int i,j,k;
+  int i,j,k,valid_path;
   
   allowed_paths = config_lookup(cfg, "privio.allowed_paths");
   if (config_setting_type(allowed_paths) != CONFIG_TYPE_ARRAY){
-    fprintf(stderr, "privio.allowed_paths is not defined as an array!  Failed...");
+    privio_debug(cfg, DBG_ERROR, "privio.allowed_paths is not defined as an array!  Failed...");
     return 0;
   }
 
@@ -122,22 +122,22 @@ int privioPathValidator(config_t *cfg, privioArgs paths, int path_count){
     regs = realloc(regs, (j+1)*sizeof(regex_t));
     pathreg = (char*)config_setting_get_string_elem(allowed_paths, j);
     if(regcomp(&regs[j], pathreg, REG_EXTENDED|REG_NOSUB)){
-      fprintf(stderr, "Invalid regular expression, %s\n", pathreg);
+      privio_debug(cfg, DBG_ERROR, "Invalid regular expression, %s\n", pathreg);
       return 0;
     }
   }
 
   /* Match against the compiled regular expressions */
   for (i = 0; i < j; i++){
-    for (k = 0; k < path_count; k++){
-      privio_debug(cfg, DBG_DEBUG3, "Compare %s to %s\n", config_setting_get_string_elem(allowed_paths, i), paths[k]);
-      if(!regexec(&regs[i], paths[k], strlen(paths[k]), NULL, 0))
-        return 1;
+    privio_debug(cfg, DBG_DEBUG3, "Compare %s to %s\n", config_setting_get_string_elem(allowed_paths, i), path);
+    if(!regexec(&regs[i], path, strlen(path), NULL, 0)){
+      free(regs);
+      return 0;
     }
   }
 
   free(regs);
-  return 0;  
+  return -1;  
 }
 
 /* Dan Bernstein's djb2... we just want to hash the command passed
@@ -155,9 +155,9 @@ unsigned int cmdHash(const char *str){
 
 /* return a function pointer for the OP we want to call
  * any of the privio calls will return an int and take 
- * a config_t* and a privioArgs* */
+ * a config_t* and a char** */
 privioFunction getOpFromCommand(config_t *cfg, const char *cmd){
-  int (*fpointer)(config_t *, privioArgs *) = NULL;
+  int (*fpointer)(config_t *) = NULL;
 
   privio_debug(cfg, DBG_DEBUG3, "Getting function pointer from command argument %s\n", cmd);
 
@@ -198,4 +198,34 @@ void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
     vfprintf(stderr, fmt, arg_list);
   }
   va_end(arg_list);
+}
+
+char **privioReadPaths(config_t *cfg, int path_count){
+  int i,j;
+  char buf[8192];
+  char **paths = NULL;
+
+  memset(buf, 0, 8192);
+
+  privio_debug(cfg, DBG_DEBUG3, "Getting required paths.\n");
+
+  for (i = 0; i < path_count; i++){
+    fgets(buf, 8192, stdin);
+
+    for (j = 0; j <= strlen(buf); j++){
+      if (buf[j] == '\n' || buf[j] == '\r')
+        buf[j] = 0;
+    }
+
+    if (privioPathValidator(cfg, buf)){
+      privio_debug(cfg, DBG_ERROR, "Path %s is not allowed!\n", buf);
+      return NULL;
+    } else {
+      paths = (char**)realloc(paths,sizeof(char*));
+      paths[i] = (char*)malloc(sizeof(char)*strlen(buf));
+      strncpy(paths[i], buf, strlen(buf));
+    }
+  }
+
+  return paths;
 }

@@ -37,12 +37,13 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <string.h>
+#include <stdlib.h>
 
 int main(int argc, char *argv[]){
 
   config_t cfg;
-  privioArgs arguments;
-  int i, j = 0;
+  char **arguments = NULL;
+  int i, j, last_j;
   privioFunction f2call = NULL;
   static uid_t ruid;
   struct passwd *user, *switch_user;
@@ -54,47 +55,20 @@ int main(int argc, char *argv[]){
   
   privio_debug(&cfg, DBG_VERBOSE, "Successfully read configuration!\n");
 
-  /* Parse arguments to determine command requested and 
-     path arguments to said command. 
-
-     Path arguments should be separated by a double hyphen --
-     so that we can easily handle paths and items that 
-     contain spaces
-  */
-  for (i=3; i < argc; i++){
-    if (!strcmp(argv[i], "--")){
-      if (j >= 7){
-        fprintf(stderr, "Too many arguments passed.");
-        return -1;
-      }
-      j++;
-    } else {
-      strcat(arguments[j], argv[i]);
-      if (i < argc-1)
-        strcat(arguments[j], " ");
-    }
-  }
-
-  /* Validate path arguments */
-  if (!privioPathValidator(&cfg, arguments, j+1)){
-    privio_debug(&cfg, DBG_ERROR, "Invalid path argument specified!\n");
-    return -2;
-  }
-
   /* Change to the appropriate user, following config file rules */ 
-  if (privioUserSwitch(&cfg, argv[2]) != 0){
+  if (privioUserSwitch(&cfg, argv[1]) != 0){
     ruid = getuid();
     switch_user = getpwuid(ruid);
-    privio_debug(&cfg, DBG_ERROR, "Couldn't switch from %s to %s\n", switch_user->pw_name, argv[2]);
+    privio_debug(&cfg, DBG_ERROR, "Couldn't switch from %s to %s\n", switch_user->pw_name, argv[1]);
     return -1;
   }
 
   /* Get function call based on cmd passed in command args */
-  f2call = getOpFromCommand(&cfg, argv[1]);
+  f2call = getOpFromCommand(&cfg, argv[2]);
 
   /* Call it! */
   if (f2call != NULL)
-    return (*f2call)(&cfg, &arguments);
+    return (*f2call)(&cfg);
   else
     return -1;
 }
