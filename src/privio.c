@@ -33,22 +33,21 @@
  *       - chmod
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "privio.h"
 
-int main(int argc, char **argv){
+int main(int argc, char *argv[]){
 
+  config_t cfg;
   privioArgs arguments;
   int i, j = 0;
   int (*f2call)(privioArgs) = NULL;
-  config_t conf;
 
-  if(privioGetConfig(PRIVIO_CONFIG_PATH, &conf) != 0){
+  if(privioGetConfig(&cfg) != 0){
     fprintf(stderr, "Problem reading configuration!\n");
     return -10;
   }
+  
+  privio_debug(&cfg, 2, "Successfully read configuration!\n");
 
   /* Check UID and exit if we're root */ 
 
@@ -75,7 +74,7 @@ int main(int argc, char **argv){
 
   /* Validate path arguments */
   fprintf(stderr, "%d\n", j);
-  if (!privioPathValidator(arguments, j+1, &conf)){
+  if (!privioPathValidator(&cfg, arguments, j+1)){
     fprintf(stderr, "Invalid path argument specified!\n");
     return -2;
   }

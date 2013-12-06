@@ -10,7 +10,6 @@
  *
  */
 
-#include <stdlib.h>
 #include "privio.h"
 
 int privioGetConfig(config_t *cfg){
@@ -32,7 +31,7 @@ int privioGetConfig(config_t *cfg){
   return 0;
 }
 
-int privioPathValidator(privioArgs paths, int path_count, config_t *conf){
+int privioPathValidator(config_t *cfg, privioArgs paths, int path_count){
   /* TODO: Store regex for valid paths in cwa_plugin_settings
    * connect via active record library, use regex to validate
    * path
@@ -44,7 +43,7 @@ int privioPathValidator(privioArgs paths, int path_count, config_t *conf){
   int reg_count;
   int i,j,k;
   
-  allowed_paths = config_lookup(conf, "privio.allowed_paths");
+  allowed_paths = config_lookup(cfg, "privio.allowed_paths");
   if (config_setting_type(allowed_paths) != CONFIG_TYPE_ARRAY){
     fprintf(stderr, "privio.allowed_paths is not defined as an array!  Failed...");
     return 0;
@@ -92,8 +91,8 @@ unsigned int cmdHash(const char *str){
  * any of the privio calls will return an int and take 
  * an array of character arrays
  */
-void *getOpFromCommand(const char *cmd){
-  int (*fpointer)(const char**, config_t *conf) = NULL;
+void *getOpFromCommand(config_t *cfg, const char *cmd){
+  int (*fpointer)(config_t *, const char**) = NULL;
 
   switch(cmdHash(cmd)){
 /*    case CMD_WRITE:   fpointer = &privioReader; break;
@@ -112,9 +111,23 @@ void *getOpFromCommand(const char *cmd){
   return fpointer;
 }
 
-int privio_debug(conf_t *cfg, const char *fmt, ...){
+void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
   va_list arg_list;
+  const config_setting_t *debug_level_setting;
+  /*const config_setting_t *log_file;*/
+  int cfg_debug_level;
+  /*char *path;*/
+
   va_start(arg_list, fmt);
 
-   
+  debug_level_setting = config_lookup(cfg, "privio.debug_level");
+  if (config_setting_type(debug_level_setting) != CONFIG_TYPE_INT){
+    fprintf(stderr, "privio.debug is not defined as an integer!  Exiting...");
+  }
 
+  cfg_debug_level = config_setting_get_int(debug_level_setting);
+
+  if (dbg_level > cfg_debug_level){
+    vfprintf(stderr, fmt, arg_list);
+  }
+}
