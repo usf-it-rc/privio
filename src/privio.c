@@ -40,14 +40,14 @@ int main(int argc, char *argv[]){
   config_t cfg;
   privioArgs arguments;
   int i, j = 0;
-  int (*f2call)(privioArgs) = NULL;
+  privioFunction f2call = NULL;
 
   if(privioGetConfig(&cfg) != 0){
     fprintf(stderr, "Problem reading configuration!\n");
     return -10;
   }
   
-  privio_debug(&cfg, 2, "Successfully read configuration!\n");
+  privio_debug(&cfg, DBG_VERBOSE, "Successfully read configuration!\n");
 
   /* Check UID and exit if we're root */ 
 
@@ -73,17 +73,16 @@ int main(int argc, char *argv[]){
   }
 
   /* Validate path arguments */
-  fprintf(stderr, "%d\n", j);
   if (!privioPathValidator(&cfg, arguments, j+1)){
-    fprintf(stderr, "Invalid path argument specified!\n");
+    privio_debug(&cfg, DBG_ERROR, "Invalid path argument specified!\n");
     return -2;
   }
 
   /* Get function call based on cmd passed in command args */
-/*  f2call = getOpFromCommand(argv[1]); */
+  f2call = getOpFromCommand(&cfg, argv[1]);
 
   /* Call it! */
-/*  return (*f2call)(arguments); */
+  return (*f2call)(&cfg, &arguments);
   return 0;
 }
 

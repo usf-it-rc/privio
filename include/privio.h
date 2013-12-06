@@ -21,23 +21,32 @@
 #define CMD_LIST 0x7C9A1661
 #define CMD_TAIL 0x7C9E560F
 
+/* Debug level defines */
+#define DBG_ERROR   1
+#define DBG_INFO    2 
+#define DBG_VERBOSE 3
+#define DBG_DEBUG1  4
+#define DBG_DEBUG2  5
+#define DBG_DEBUG3  6
+
 typedef char privioArgs[PRIVIO_MAX_OPERANDS][PRIVIO_MAX_OPERAND_LENGTH];
+typedef int (* privioFunction)(config_t *, privioArgs *);
 
 /* top-level functions */
-int privioWriter(privioArgs*, config_t *);
-int privioReader(privioArgs*, config_t *);
-int privioMkdir(privioArgs*, config_t *);
-int privioRename(privioArgs*, config_t *);
-int privioZipreaddir(privioArgs*, config_t *);
-int privioMove(privioArgs*, config_t *);
-int privioFilelines(privioArgs*, config_t *);
-int privioFiletype(privioArgs*, config_t *);
-int privioDirlist(privioArgs*, config_t *);
-int privioFiletail(privioArgs*, config_t *);
+int privio_writer(config_t *, privioArgs *);
+int privio_reader(config_t *, privioArgs *);
+int privio_mkdir(config_t *, privioArgs *);
+int privio_rename(config_t *, privioArgs *);
+int privio_zip(config_t *, privioArgs *);
+int privio_mv(config_t *, privioArgs *);
+int privio_lines(config_t *, privioArgs *);
+int privio_type(config_t *, privioArgs *);
+int privio_list(config_t *, privioArgs *);
+int privio_tail(config_t *, privioArgs *);
 
 /* utility functions */
 int privioGetConfig(config_t *);
 int privioPathValidator(config_t *, privioArgs, int);
 unsigned int cmdHash(const char *);
-void *getOpFromCommand(config_t *, const char *);
+privioFunction getOpFromCommand(config_t *, const char *);
 void privio_debug(config_t *, int, const char *, ...);

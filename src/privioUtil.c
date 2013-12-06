@@ -63,8 +63,8 @@ int privioPathValidator(config_t *cfg, privioArgs paths, int path_count){
 
   /* Match against the compiled regular expressions */
   for (i = 0; i < j; i++){
-    for (k = 0; k <= path_count; k++){
-      fprintf(stderr, "Compare %s to %s\n", config_setting_get_string_elem(allowed_paths, i), paths[k]);
+    for (k = 0; k < path_count; k++){
+      privio_debug(cfg, DBG_DEBUG3, "Compare %s to %s\n", config_setting_get_string_elem(allowed_paths, i), paths[k]);
       if(!regexec(&regs[i], paths[k], strlen(paths[k]), NULL, 0))
         return 1;
     }
@@ -91,26 +91,29 @@ unsigned int cmdHash(const char *str){
  * any of the privio calls will return an int and take 
  * an array of character arrays
  */
-void *getOpFromCommand(config_t *cfg, const char *cmd){
-  int (*fpointer)(config_t *, const char**) = NULL;
+privioFunction getOpFromCommand(config_t *cfg, const char *cmd){
+  int (*fpointer)(config_t *, privioArgs *) = NULL;
+
+  privio_debug(cfg, DBG_DEBUG3, "Getting function pointer from command argument %s\n", cmd);
 
   switch(cmdHash(cmd)){
-/*    case CMD_WRITE:   fpointer = &privioReader; break;
-    case CMD_READ:    fpointer = &privioWriter; break;
-    case CMD_MKDIR:   fpointer = &privioMkdir; break;
-    case CMD_RENAME:  fpointer = &privioRename; break;
-    case CMD_ZIPREAD: fpointer = &privioZipreaddir; break;
-    case CMD_MOVE:    fpointer = &privioMove; break;
-    case CMD_LINES:   fpointer = &privioFilelines; break;
-    case CMD_TYPE:    fpointer = &privioFiletype; break;
-    case CMD_DLIST:   fpointer = &privioDirlist; break;
-    case CMD_TAIL :   fpointer = &privioFiletail; break;*/
-    default: return NULL;
+    case CMD_WRITE:   fpointer = &privio_writer; break;
+    case CMD_READ:    fpointer = &privio_reader; break;
+    case CMD_MKDIR:   fpointer = &privio_mkdir; break;
+    case CMD_RENAME:  fpointer = &privio_rename; break;
+    case CMD_ZIP:     fpointer = &privio_zip; break;
+    case CMD_MV:      fpointer = &privio_mv; break;
+    case CMD_LINES:   fpointer = &privio_lines; break;
+    case CMD_TYPE:    fpointer = &privio_type; break;
+    case CMD_LIST:    fpointer = &privio_list; break;
+    case CMD_TAIL :   fpointer = &privio_tail; break;
+    default: privio_debug(cfg, DBG_INFO, "Invalid command specified!\n"); return NULL;
   }
 
   return fpointer;
 }
 
+/* Make it easy to print out debugging statements, info, errors, etc. */
 void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
   va_list arg_list;
   const config_setting_t *debug_level_setting;
@@ -127,7 +130,8 @@ void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
 
   cfg_debug_level = config_setting_get_int(debug_level_setting);
 
-  if (dbg_level > cfg_debug_level){
+  if (dbg_level <= cfg_debug_level){
+    fprintf(stderr, "DEBUG %d: ", dbg_level);
     vfprintf(stderr, fmt, arg_list);
   }
 }
