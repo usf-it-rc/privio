@@ -34,6 +34,9 @@
  */
 
 #include "privio.h"
+#include <sys/types.h>
+#include <pwd.h>
+#include <string.h>
 
 int main(int argc, char *argv[]){
 
@@ -41,6 +44,8 @@ int main(int argc, char *argv[]){
   privioArgs arguments;
   int i, j = 0;
   privioFunction f2call = NULL;
+  static uid_t ruid;
+  struct passwd *user, *switch_user;
 
   if(privioGetConfig(&cfg) != 0){
     fprintf(stderr, "Problem reading configuration!\n");
@@ -49,8 +54,6 @@ int main(int argc, char *argv[]){
   
   privio_debug(&cfg, DBG_VERBOSE, "Successfully read configuration!\n");
 
-  /* Check UID and exit if we're root */ 
-
   /* Parse arguments to determine command requested and 
      path arguments to said command. 
 
@@ -58,7 +61,7 @@ int main(int argc, char *argv[]){
      so that we can easily handle paths and items that 
      contain spaces
   */
-  for (i=2; i < argc; i++){
+  for (i=3; i < argc; i++){
     if (!strcmp(argv[i], "--")){
       if (j >= 7){
         fprintf(stderr, "Too many arguments passed.");
@@ -78,12 +81,22 @@ int main(int argc, char *argv[]){
     return -2;
   }
 
+  /* Change to the appropriate user, following config file rules */ 
+  if (privioUserSwitch(&cfg, argv[2]) != 0){
+    ruid = getuid();
+    switch_user = getpwuid(ruid);
+    privio_debug(&cfg, DBG_ERROR, "Couldn't switch from %s to %s\n", switch_user->pw_name, argv[2]);
+    return -1;
+  }
+
   /* Get function call based on cmd passed in command args */
   f2call = getOpFromCommand(&cfg, argv[1]);
 
   /* Call it! */
-  return (*f2call)(&cfg, &arguments);
-  return 0;
+  if (f2call != NULL)
+    return (*f2call)(&cfg, &arguments);
+  else
+    return -1;
 }
 
 /*

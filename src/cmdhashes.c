@@ -1,6 +1,7 @@
+#include <privio.h>
 #include <stdio.h>
 #include <string.h>
-#include "privio.h"
+
 #define CMD_COUNT 14
 #define CMD_LENGTH 16
 

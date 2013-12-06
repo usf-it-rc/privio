@@ -11,7 +11,75 @@
  */
 
 #include "privio.h"
+#include <regex.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <pwd.h>
 
+/* Validate executing user, then setuid to the user we want to be */
+int privioUserSwitch(config_t *cfg, const char *uid){
+  uid_t ruid;
+  struct passwd *user, *switch_user;
+  int status, allowed_count, forbidden_count, i, acl_check;
+  const config_setting_t *forbidden_accounts, *allowed_users;
+  char *check_user;
+
+  ruid = getuid();
+  user = getpwuid(ruid);
+
+  switch_user = getpwnam(uid);
+
+  /* Make sure our executing user is in the allowed_users list */
+  allowed_users = config_lookup(cfg, "privio.allowed_users");
+  allowed_count = config_setting_length(allowed_users);
+
+  acl_check = 0;
+
+  for (i=0; i<allowed_count; i++){
+    check_user = (char*)config_setting_get_string_elem(allowed_users, i);
+    if(!strncmp(check_user, user->pw_name, strlen(user->pw_name)))
+      acl_check = 1;
+  }
+
+  if (acl_check == 0){
+    privio_debug(cfg, DBG_ERROR, "User %s is not allowed to execute privio!\n", user->pw_name);
+    return -1;
+  }
+
+  /* Make sure our switch user is not in the forbidden_accounts list */
+  forbidden_accounts = config_lookup(cfg, "privio.forbidden_accounts");
+  forbidden_count = config_setting_length(forbidden_accounts);
+
+  acl_check = 0;
+
+  for (i=0; i<forbidden_count; i++){
+    check_user = (char*)config_setting_get_string_elem(forbidden_accounts, i);
+    if(!strncmp(check_user, switch_user->pw_name, strlen(switch_user->pw_name)))
+      acl_check = 1;
+  }
+
+  if (acl_check != 0){
+    privio_debug(cfg, DBG_ERROR, "privio is not allowed to switch to user %s!\n", switch_user->pw_name);
+    return -1;
+  }
+
+  if (user == NULL){
+    privio_debug(cfg, DBG_ERROR, "User to switch, %s, does not exist!\n", uid);
+    return -1; 
+  } else {
+    status = setuid(switch_user->pw_uid);
+    if (status < 0){
+      privio_debug(cfg, DBG_ERROR, "Couldn't setuid to \"%s\"!\n", switch_user->pw_name);
+      return -1;
+    }
+  }
+  return 0;
+}
+
+/* Initialize the config_t structure from the defined PRIVIO_CONFIG_PATH */
 int privioGetConfig(config_t *cfg){
   FILE *fp;
 
@@ -31,11 +99,9 @@ int privioGetConfig(config_t *cfg){
   return 0;
 }
 
+/* Snag regexes from privio.allowed_paths and ensure that our operands 
+ * passed on the command line match at least one of these expressions */
 int privioPathValidator(config_t *cfg, privioArgs paths, int path_count){
-  /* TODO: Store regex for valid paths in cwa_plugin_settings
-   * connect via active record library, use regex to validate
-   * path
-   */
 
   char *pathreg;
   const config_setting_t *allowed_paths;
@@ -70,13 +136,13 @@ int privioPathValidator(config_t *cfg, privioArgs paths, int path_count){
     }
   }
 
+  free(regs);
   return 0;  
 }
 
 /* Dan Bernstein's djb2... we just want to hash the command passed
  * and get minimal collisions... enough to describe the necessary
- * file operations 
- */
+ * file operations */
 unsigned int cmdHash(const char *str){
   unsigned int hash = 5381;
   int c;
@@ -89,8 +155,7 @@ unsigned int cmdHash(const char *str){
 
 /* return a function pointer for the OP we want to call
  * any of the privio calls will return an int and take 
- * an array of character arrays
- */
+ * a config_t* and a privioArgs* */
 privioFunction getOpFromCommand(config_t *cfg, const char *cmd){
   int (*fpointer)(config_t *, privioArgs *) = NULL;
 
@@ -117,9 +182,7 @@ privioFunction getOpFromCommand(config_t *cfg, const char *cmd){
 void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
   va_list arg_list;
   const config_setting_t *debug_level_setting;
-  /*const config_setting_t *log_file;*/
   int cfg_debug_level;
-  /*char *path;*/
 
   va_start(arg_list, fmt);
 
@@ -134,4 +197,5 @@ void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
     fprintf(stderr, "DEBUG %d: ", dbg_level);
     vfprintf(stderr, fmt, arg_list);
   }
+  va_end(arg_list);
 }
