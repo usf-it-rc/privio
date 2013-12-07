@@ -1,6 +1,6 @@
-= privio... 
+h1. privio... 
 
-A library for providing privileged file access to a trusted user.  This
+A tool for providing privileged file access to a trusted user.  This
 allows for things like web applications who's users map to POSIX users
 to manipulate files and directories beloging to said user.  
 

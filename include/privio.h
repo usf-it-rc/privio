@@ -26,6 +26,7 @@
 #include <libconfig.h>
 
 typedef int (* privioFunction)(config_t *);
+extern char *privio_error;
 
 /* top-level functions */
 int privio_writer(config_t *);

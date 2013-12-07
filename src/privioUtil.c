@@ -76,6 +76,13 @@ int privioUserSwitch(config_t *cfg, const char *uid){
     privio_debug(cfg, DBG_ERROR, "Couldn't setuid to \"%s\"!\n", switch_user->pw_name);
     return -1;
   }
+
+  status = setgid(switch_user->pw_gid);
+  if (status < 0){
+    privio_debug(cfg, DBG_ERROR, "Couldn't setgid to \"%d\"!\n", switch_user->pw_gid);
+    return -1;
+  }
+
   return 0;
 }
 
@@ -204,6 +211,7 @@ char **privioReadPaths(config_t *cfg, int path_count){
   int i,j;
   char buf[8192];
   char **paths = NULL;
+  char *privio_error;
 
   memset(buf, 0, 8192);
 

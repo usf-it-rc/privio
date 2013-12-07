@@ -9,5 +9,5 @@ include_directories("${privio_SOURCE_DIR}/include")
 add_executable (privio privio.c ${PRIVIO_OBJS})
 add_executable (cmdhashes ${CMDHASH_OBJS})
 
-target_link_libraries(privio config)
-target_link_libraries(cmdhashes config)
+target_link_libraries(privio config magic)
+target_link_libraries(cmdhashes config magic)
