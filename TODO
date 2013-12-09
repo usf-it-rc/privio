@@ -1,5 +1,5 @@
 -cmdhashes.c
-lines.c
+-lines.c
 list.c
 mkdir.c
 mv.c
