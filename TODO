@@ -1,0 +1,13 @@
+-cmdhashes.c
+lines.c
+list.c
+mkdir.c
+mv.c
+-privio.c
+-privioUtil.c
+-reader.c
+rename.c
+tail.c
+-type.c
+-writer.c
+zip.c
