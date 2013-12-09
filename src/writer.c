@@ -1,11 +1,27 @@
+/*
+ * privio_writer(config_t *cfg)
+ *
+ * privio_writer() grabs a single path specification from privioReadPaths(),
+ * reads block_size bytes at a time from stdin and writes the read bytes to 
+ * the first path returned by privioReadPaths()
+ * 
+ */
+
 #include "privio.h"
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 int privio_writer(config_t *cfg){
   char **paths;
-  FILE *fp;
+  int out_file, n;
+  void *buf;
+  config_setting_t *write_block_size;
+  long long block_size;
 
   paths = privioReadPaths(cfg, 1);
 
@@ -13,16 +29,31 @@ int privio_writer(config_t *cfg){
     return EPERM;
 
   privio_debug(cfg, DBG_INFO, "Writing to %s\n", paths[0]);
-  umask(0077);
-  fp = fopen(paths[0], "w");
-  if (fp == NULL){
-    privio_debug(cfg, DBG_VERBOSE, "Error opening file %s: %s\n", strerror(errno));
+  out_file = open(paths[0], O_CREAT|O_WRONLY|O_TRUNC, 00600);
+
+  if (out_file == -1){
+    privio_debug(cfg, DBG_VERBOSE, "Error opening file %s: %s\n", paths[0], strerror(errno));
     return errno;
   }
 
-  /* read from named pipe, write to fp */
+  privio_debug(cfg, DBG_DEBUG3, "Opened %s as descriptor %d\n", paths[0], out_file);
 
-  fclose(fp);
+  write_block_size = config_lookup(cfg, "privio.io.writer_block_size");
+  block_size = config_setting_get_int(write_block_size);
+
+  buf = (void*)malloc(block_size);
+
+  /* read from stdin, write to fp */
+  while ((n = read(fileno(stdin), buf, block_size)) > 0){
+    write(out_file, buf, n);
+  }
+
+  if (n == -1)
+    privio_debug(cfg, DBG_VERBOSE, "Error reading file %s: %s\n", paths[0], strerror(errno));
+
+  privio_debug(cfg, DBG_INFO, "Closing %s\n", paths[0]);
+
+  close(out_file);
   
   return 0;
 }

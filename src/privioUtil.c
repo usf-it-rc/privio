@@ -208,30 +208,42 @@ void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
 }
 
 char **privioReadPaths(config_t *cfg, int path_count){
-  int i,j;
-  char buf[8192];
+  int i,j,ch;
+  char line[8192];
   char **paths = NULL;
   char *privio_error;
-
-  memset(buf, 0, 8192);
+  size_t len;
 
   privio_debug(cfg, DBG_DEBUG3, "Getting required paths.\n");
 
   for (i = 0; i < path_count; i++){
-    fgets(buf, 8192, stdin);
-
-    for (j = 0; j <= strlen(buf); j++){
-      if (buf[j] == '\n' || buf[j] == '\r')
-        buf[j] = 0;
+    /* surprisingly not easy to just read a line at
+     * a time from stdin, then leave it open to read
+     * a stream */
+    for (len=0; len<=8192; len++){
+      read(fileno(stdin), &ch, 1);
+      if (ch == '\n' || ch == '\r'){
+        line[len] = '\0';
+        break;
+      }
+      line[len] = ch;
     }
 
-    if (privioPathValidator(cfg, buf)){
-      privio_debug(cfg, DBG_ERROR, "Path %s is not allowed!\n", buf);
+    paths = (char**)realloc(paths,sizeof(char*));
+    paths[i] = (char*)malloc(sizeof(char)*len);
+    memset(paths[i], 0, sizeof(char)*len);
+    strncpy(paths[i], line, len);
+    paths[i][len] = '\0';
+
+    /* get rid of new line characters */
+    for (j = strlen(paths[i]); j >= strlen(paths[i])-3; j--){
+      if (paths[i][j] == '\n' || paths[i][j] == '\r')
+        paths[i][j] = '\0';
+    }
+
+    if (privioPathValidator(cfg, paths[i])){
+      privio_debug(cfg, DBG_ERROR, "Path %s is not allowed!\n", paths[i]);
       return NULL;
-    } else {
-      paths = (char**)realloc(paths,sizeof(char*));
-      paths[i] = (char*)malloc(sizeof(char)*strlen(buf));
-      strncpy(paths[i], buf, strlen(buf));
     }
   }
 
