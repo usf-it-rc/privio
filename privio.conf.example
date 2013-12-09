@@ -1,27 +1,65 @@
+/*
+ * This is the privio configuration file.  Statements are explained below.  
+ * The file is expressed in libconfig format: 
+ *
+ * http://www.hyperrealm.com/libconfig/
+ *
+ */
+
 version = "0.1";
 
 privio:
 {
-  // Define the bock sizes for read and write operations.  Default is 1MiB
+  // Secret key.  This will be used as a very basic authentication mechanism for privio.
+  // A user MUST be in the allowed_users list and must also know the secret key in
+  // order to call privio.  This is a simple comparison
+
+  secret_key = "ThisIsADefaultSecretKeyAndShouldBeChanged";
+
+  // Define the bock sizes for read and write operations.  Default is 1MiB.  This
+  // is the read/write size for each low-level read()/write() operation.
+
   io:
   {
     reader_block_size = 0x100000;
     writer_block_size = 0x100000;
   };
 
-  // These are paths that privio is allowed to manage
+  // These are paths that privio is allowed to access
   // Can be extended regular expressions
+
   allowed_paths = [ "/home/[a-z]/[ -~]+", "/work/[a-z]/[ -~]+", "/shares/[ -~]+" ];
+
+  // This is the verbosity level
+  // 1 error only messages
+  // 2 info messages
+  // 3 verbose messages
+  // 4 debug level 1
+  // 5 debug level 2
+  // 6 debug level 3 - lots of stuff
+
   debug_level = 6;
+
+  // Specify the path to the log file... (has no effect yet)
+
   log_file = "privio.log";
 
-  // These are users that are allowed to run privio
+  // These are users that are allowed to run privio.  If a user attempts to run
+  // privio and they are not in this list, they will receive a nasty error message
+  // telling them to buzz off.  Privio should generally only be used by a higher-level
+  // API for some other framework (e.g. a Rails or PHP-based file manager, etc.), so the
+  // user running your web application should be in this list.
+  //
+  // With this in mind, your web framework code should follow a solid security model if
+  // you intend on marrying it with privio
+
   allowed_users = [ "redmine" ];
   
-  // These are users that privio cannot switch to
-  forbidden_accounts = [ "root","bin","daemon","adm","lp","sync","shutdown","halt", \
-    "mail","uucp","operator","games","gopher","ftp","nobody","dbus","vcsa","abrt", \
-    "haldaemon","ntp","saslauth","postfix","sshd","tcpdump","apache","rpc","rpcuser", \
-    "nfsnobody" ];
+  // These are users that privio cannot switch to.  Clearly, system users or privileged
+  // accounts that you do not want accessed should be in this list.  You should ALWAYS
+  // include root, unless you are stupid or crazy.  I may even modify the code to forbid
+  // root regardless of this setting.
+
+  forbidden_accounts = [ "root","bin","daemon","adm","lp","sync","shutdown","halt", "mail","uucp","operator","games","gopher","ftp","nobody","dbus","vcsa","abrt", "haldaemon","ntp","saslauth","postfix","sshd","tcpdump","apache","rpc","rpcuser", "nfsnobody" ];
 }; 
 

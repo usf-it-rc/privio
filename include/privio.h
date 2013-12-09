@@ -25,20 +25,20 @@
 #include <privioConfig.h>
 #include <libconfig.h>
 
-typedef int (* privioFunction)(config_t *);
+typedef int (* privioFunction)(config_t *, const char **);
 extern char *privio_error;
 
 /* top-level functions */
-int privio_writer(config_t *);
-int privio_reader(config_t *);
-int privio_mkdir(config_t *);
-int privio_rename(config_t *);
-int privio_zip(config_t *);
-int privio_mv(config_t *);
-int privio_lines(config_t *);
-int privio_type(config_t *);
-int privio_list(config_t *);
-int privio_tail(config_t *);
+int privio_writer(config_t *, const char **);
+int privio_reader(config_t *, const char **);
+int privio_mkdir(config_t *, const char **);
+int privio_rename(config_t *, const char **);
+int privio_zip(config_t *, const char **);
+int privio_mv(config_t *, const char **);
+int privio_lines(config_t *, const char **);
+int privio_type(config_t *, const char **);
+int privio_list(config_t *, const char **);
+int privio_tail(config_t *, const char **);
 
 /* utility functions */
 int privioGetConfig(config_t *);

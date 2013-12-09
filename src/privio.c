@@ -20,7 +20,7 @@
  *                                      provides RESTful API for typical 
  *                                      filesystem access patterns
  *   - cwa_browser_helper
- *     - Open3 -> sudo -u <authenticated_user> cwaiohelper
+ *     - Open3 -> /path/to/privio <user> <operation>
  *       - read
  *       - write
  *       - mkdir
@@ -42,6 +42,8 @@
 int main(int argc, char *argv[]){
 
   config_t cfg;
+  config_setting_t *secret_key;
+  const char *secret_key_val;
   char **arguments = NULL;
   int i, j, last_j;
   privioFunction f2call = NULL;
@@ -55,42 +57,35 @@ int main(int argc, char *argv[]){
   
   privio_debug(&cfg, DBG_VERBOSE, "Successfully read configuration!\n");
 
+  secret_key = config_lookup(&cfg, "privio.secret_key");
+  secret_key_val = config_setting_get_string(secret_key);
+
+  if(strncmp(secret_key_val, argv[1], strlen(secret_key_val))){
+    privio_debug(&cfg, DBG_ERROR, "Invalid secret key specified!\n");
+    return 1;
+  } 
+
   /* Change to the appropriate user, following config file rules */ 
-  if (privioUserSwitch(&cfg, argv[1]) != 0){
+  if (privioUserSwitch(&cfg, argv[2]) != 0){
     ruid = getuid();
     switch_user = getpwuid(ruid);
-    privio_debug(&cfg, DBG_ERROR, "Couldn't switch from %s to %s\n", switch_user->pw_name, argv[1]);
+    privio_debug(&cfg, DBG_ERROR, "Couldn't switch from %s to %s\n", switch_user->pw_name, argv[2]);
     return -1;
   }
 
+  for (i = 4; i < argc; i++){
+    if(privioPathValidator(&cfg, argv[i])){
+      privio_debug(&cfg, DBG_ERROR, "Path %s is not allowed!\n", argv[i]);
+      return 2;
+    }
+  }
+
   /* Get function call based on cmd passed in command args */
-  f2call = getOpFromCommand(&cfg, argv[2]);
+  f2call = getOpFromCommand(&cfg, argv[3]);
 
   /* Call it! */
   if (f2call != NULL)
-    return (*f2call)(&cfg);
+    return (*f2call)(&cfg, (const char**)&argv[4]);
   else
     return -1;
 }
-
-/*
-case "$cmd" in
-  write)  dd bs=$((1024*128)) of="${argv[0]}" ;;
-  read)   dd bs=$((1024*128)) if="${argv[0]}" ;;
-  zip)    cd ${argv[0]}; zip -q -r - "${argv[1]}" ;;
-  rm)     rm -r "${argv[0]}" ;;
-  rename) mv "${argv[0]}" "${argv[1]}" ;;
-  cp)     count=$(find "${argv[0]}" | wc -l)
-          rsync -ai "${argv[0]}" "${argv[1]}" 2>&1 | pv -nls $(((count)+4)) > /dev/null
-    ;;  
-  mkdir)  mkdir "${argv[0]}" ;;
-  mv)     count=$(find "${argv[0]}" | wc -l)
-          rsync -ai --remove-source-files "${argv[0]}" "${argv[1]}" 2>&1 | pv -nls $(((count)+4)) > /dev/null && ([ -d "${argv[0]}"] && rmdir -r "${argv[0]}")
-    ;;  
-  stat)   stat -c "%s" "${argv[0]}" ;;
-  mkdir)  mkdir "${argv[0]}" ;;
-  lines)  wc -l "${argv[0]}" | awk '{ print $1 }' ;;
-  type)   file -bi "${argv[0]}" ;;
-  list)   find "${argv[0]}" ! -path "${argv[0]}" ! -type l ! -iname '.*' -maxdepth 1 -type ${argv[1]} -printf "%f::%s::%u::%g::%m::%CD %Cr %CZ\n" | sort -f ;;
-  *) echo "No way, Jose!"; exit 1 ;;
-esac */

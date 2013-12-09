@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <pwd.h>
+#include <errno.h>
 
 /* Validate executing user, then setuid to the user we want to be */
 int privioUserSwitch(config_t *cfg, const char *uid){
@@ -71,15 +72,15 @@ int privioUserSwitch(config_t *cfg, const char *uid){
     return -1;
   }
 
-  status = setuid(switch_user->pw_uid);
-  if (status < 0){
-    privio_debug(cfg, DBG_ERROR, "Couldn't setuid to \"%s\"!\n", switch_user->pw_name);
+  status = setgid(switch_user->pw_gid);
+  if (status != 0){
+    privio_debug(cfg, DBG_ERROR, "Couldn't setgid to \"%d\": %s\n", switch_user->pw_gid, strerror(errno));
     return -1;
   }
 
-  status = setgid(switch_user->pw_gid);
-  if (status < 0){
-    privio_debug(cfg, DBG_ERROR, "Couldn't setgid to \"%d\"!\n", switch_user->pw_gid);
+  status = setuid(switch_user->pw_uid);
+  if (status != 0){
+    privio_debug(cfg, DBG_ERROR, "Couldn't setuid to \"%s\": %s\n", switch_user->pw_name, strerror(errno));
     return -1;
   }
 
@@ -164,7 +165,7 @@ unsigned int cmdHash(const char *str){
  * any of the privio calls will return an int and take 
  * a config_t* and a char** */
 privioFunction getOpFromCommand(config_t *cfg, const char *cmd){
-  int (*fpointer)(config_t *) = NULL;
+  int (*fpointer)(config_t *, const char **) = NULL;
 
   privio_debug(cfg, DBG_DEBUG3, "Getting function pointer from command argument %s\n", cmd);
 
@@ -205,47 +206,4 @@ void privio_debug(config_t *cfg, int dbg_level, const char *fmt, ...){
     vfprintf(stderr, fmt, arg_list);
   }
   va_end(arg_list);
-}
-
-char **privioReadPaths(config_t *cfg, int path_count){
-  int i,j,ch;
-  char line[8192];
-  char **paths = NULL;
-  char *privio_error;
-  size_t len;
-
-  privio_debug(cfg, DBG_DEBUG3, "Getting required paths.\n");
-
-  for (i = 0; i < path_count; i++){
-    /* surprisingly not easy to just read a line at
-     * a time from stdin, then leave it open to read
-     * a stream */
-    for (len=0; len<=8192; len++){
-      read(fileno(stdin), &ch, 1);
-      if (ch == '\n' || ch == '\r'){
-        line[len] = '\0';
-        break;
-      }
-      line[len] = ch;
-    }
-
-    paths = (char**)realloc(paths,sizeof(char*));
-    paths[i] = (char*)malloc(sizeof(char)*len);
-    memset(paths[i], 0, sizeof(char)*len);
-    strncpy(paths[i], line, len);
-    paths[i][len] = '\0';
-
-    /* get rid of new line characters */
-    for (j = strlen(paths[i]); j >= strlen(paths[i])-3; j--){
-      if (paths[i][j] == '\n' || paths[i][j] == '\r')
-        paths[i][j] = '\0';
-    }
-
-    if (privioPathValidator(cfg, paths[i])){
-      privio_debug(cfg, DBG_ERROR, "Path %s is not allowed!\n", paths[i]);
-      return NULL;
-    }
-  }
-
-  return paths;
 }
