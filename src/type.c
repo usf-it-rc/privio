@@ -17,7 +17,7 @@ int privio_type(config_t *cfg, const char **args){
 
   privio_debug(cfg, DBG_DEBUG3, "Magic errors: %s\n", magic_error(magic));
 
-  fprintf(stdout, "%s\n", mime);
+  printf("{'%s':'%s'}\n", args[0], mime);
 
   magic_close(magic);
   

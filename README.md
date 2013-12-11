@@ -19,3 +19,5 @@ As your web app user (say, 'rails')
     [rails@host ~]$ privio ThisIsADefaultSecretKeyAndShouldBeChanged jdoe write /home/jdoe/new_file < some_file
 
 This allowed the rails user to write the contents of 'some_file' to /home/jdoe/new_file, as the user 'jdoe'.
+
+All operations will display JSON-formatted result strings with the exception of the streaming operations, read, write, and zip.  The resultant stream will be the file contents, a write handle, and a stream of the zip encoded conent of a directory.

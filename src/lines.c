@@ -1,9 +1,7 @@
 /*
  * privio_lines(config_t *cfg)
  *
- * privio_lines() grabs a single path specification from privioReadPaths(),
- * reads block_size bytes at a time from the first path returned by 
- * privioReadPaths() and writes the read bytes to stdout
+ * privio_lines() returns the number of lines in a specified file
  * 
  */
 
@@ -43,7 +41,7 @@ int privio_lines(config_t *cfg, const char **args){
       if (buf[k] == '\n')
         lines++;
 
-  printf("%ld\n", lines);
+  printf("{'%s':%ld}\n", args[0], lines);
 
   if (n == -1)
     privio_debug(cfg, DBG_VERBOSE, "Error reading file %s: %s\n", args[0], strerror(errno));
