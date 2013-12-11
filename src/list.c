@@ -28,7 +28,7 @@ int privio_list(config_t *cfg, const char **args){
 
   DIR *dp;
   char *stat_path = NULL;
-  long name_max, len, item_no;
+  long name_max, len, item_no = 0;
   int error;
 
   /* TODO: Handle errors */
@@ -46,7 +46,7 @@ int privio_list(config_t *cfg, const char **args){
 
   while((error = readdir_r(dp, buf, &dentry)) == 0 && dentry != NULL){
     /* json formatting */
-    if (item_no > 0)
+    if (item_no++ > 0)
       printf(",");
 
     stat_path = (char*)malloc((strlen(args[0]) + name_max) * sizeof(char)); 
