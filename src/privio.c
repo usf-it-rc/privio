@@ -57,12 +57,9 @@ int main(int argc, char *argv[]){
   
   privio_debug(&cfg, DBG_VERBOSE, "Successfully read configuration!\n");
 
-  secret_key = config_lookup(&cfg, "privio.secret_key");
-  secret_key_val = config_setting_get_string(secret_key);
-
-  if(strncmp(secret_key_val, argv[1], strlen(secret_key_val))){
-    privio_debug(&cfg, DBG_ERROR, "Invalid secret key specified!\n");
-    return 1;
+  if(privio_auth(&cfg, argv[2], argv[1]) != 0){
+    privio_debug(&cfg, DBG_ERROR, "Invalid auth key specified!\n");
+    return 5;
   } 
 
   /* Change to the appropriate user, following config file rules */ 

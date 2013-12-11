@@ -39,6 +39,7 @@ int privio_lines(config_t *, const char **);
 int privio_type(config_t *, const char **);
 int privio_list(config_t *, const char **);
 int privio_tail(config_t *, const char **);
+int privio_auth(config_t *, const char *, const char *);
 
 /* utility functions */
 int privioGetConfig(config_t *);

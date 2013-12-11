@@ -34,14 +34,14 @@ int privio_list(config_t *cfg, const char **args){
   /* TODO: Handle errors */
   dp = opendir(args[0]);
   if (dp == NULL){
-    privio_debug(cfg, DBG_ERROR, "Problem reading %s: %s\n", strerror(errno));
+    privio_debug(cfg, DBG_ERROR, "Problem reading %s: %s\n", args[0], strerror(errno));
     return -1;
   }
 
   len = dirent_buf_size(dp);
   buf = (struct dirent *)malloc(len);
 
-  printf("{");
+  printf("{'%s':[", args[0]);
   name_max = fpathconf(dirfd(dp), _PC_NAME_MAX);
 
   while((error = readdir_r(dp, buf, &dentry)) == 0 && dentry != NULL){
@@ -53,12 +53,14 @@ int privio_list(config_t *cfg, const char **args){
     memset(stat_path, 0, (strlen(args[0]) + name_max) * sizeof(char));
     sprintf(stat_path, "%s/%s", args[0], dentry->d_name);
 
-    if (stat(stat_path, &stat_info) == -1){
-      privio_debug(cfg, DBG_ERROR, "Error on file stat %s: %s\n", stat_path, strerror(errno));
-      return -1;
-    }
-
     printf("'%s':{", dentry->d_name);
+
+    if (stat(stat_path, &stat_info) == -1){
+      printf("'stat':'%s'}", strerror(errno));
+      continue;
+    } else {
+      printf("'stat':'ok',");
+    }
 
     switch(stat_info.st_mode & S_IFMT) {
       case S_IFBLK: printf("'type':'blockdev',"); break;
@@ -96,7 +98,7 @@ int privio_list(config_t *cfg, const char **args){
     printf("}");
     free(stat_path);
   }
-  printf("}\n");
+  printf("]}\n");
 
   closedir(dp);
 
