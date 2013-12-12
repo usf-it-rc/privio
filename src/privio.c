@@ -57,6 +57,11 @@ int main(int argc, char *argv[]){
   
   privio_debug(&cfg, DBG_VERBOSE, "Successfully read configuration!\n");
 
+  if (argc < 5){
+    privio_debug(&cfg, DBG_ERROR, "Insufficient arguments.\n");
+    return 3;
+  }
+
   if(privio_auth(&cfg, argv[2], argv[1]) != 0){
     privio_debug(&cfg, DBG_ERROR, "Invalid auth key specified!\n");
     return 5;

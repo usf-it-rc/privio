@@ -5,22 +5,17 @@
 
 int privio_auth(config_t *cfg, const char *user, const char *auth_token){
   EVP_MD_CTX *mdctx;
-  const EVP_MD *md;
   config_setting_t *sec_key_setting;
   char *secret_key;
   char sha_buf[3];
   unsigned char md_value[EVP_MAX_MD_SIZE], at_value[EVP_MAX_MD_SIZE];
   int md_len, i, j;
 
-  OpenSSL_add_all_digests();
-
-  md = EVP_sha512();
-
   sec_key_setting = config_lookup(cfg, "privio.secret_key");
   secret_key = (char*)config_setting_get_string(sec_key_setting);
 
   mdctx = EVP_MD_CTX_create();
-  EVP_DigestInit_ex(mdctx, md, NULL);
+  EVP_DigestInit_ex(mdctx, EVP_sha512(), NULL);
   EVP_DigestUpdate(mdctx, user, strlen(user));
   EVP_DigestUpdate(mdctx, secret_key, strlen(secret_key));
   EVP_DigestFinal_ex(mdctx, md_value, &md_len);

@@ -15,9 +15,11 @@ int privio_type(config_t *cfg, const char **args){
   magic_compile(magic, NULL);
   mime = magic_file(magic, args[0]);
 
-  privio_debug(cfg, DBG_DEBUG3, "Magic errors: %s\n", magic_error(magic));
-
-  printf("{'%s':'%s'}\n", args[0], mime);
+  if (mime == NULL){
+    printf("{'%s':{'mime':'','error':'error accessing file'}}\n", args[0]);
+  } else {
+    printf("{'%s':{'mime':'%s','error':''}\n", args[0], mime);
+  }
 
   magic_close(magic);
   

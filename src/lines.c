@@ -16,7 +16,7 @@
 
 int privio_lines(config_t *cfg, const char **args){
   int in_file, n, k;
-  char *buf;
+  char *buf, *error_str;
   config_setting_t *read_block_size;
   long long block_size, lines = 0;
 
@@ -24,8 +24,10 @@ int privio_lines(config_t *cfg, const char **args){
   in_file = open(args[0], O_RDONLY);
 
   if (in_file == -1){
-    privio_debug(cfg, DBG_VERBOSE, "Error opening file %s: %s\n", args[0], strerror(errno));
-    return errno;
+    error_str = strerror(errno);
+    privio_debug(cfg, DBG_VERBOSE, "Error opening file %s: %s\n", args[0], error_str);
+    printf("{'%s':{'lines':-1,'error':'%s'}}\n", args[0], error_str);
+    return -1;
   }
 
   privio_debug(cfg, DBG_DEBUG3, "Opened %s as descriptor %d\n", args[0], in_file);
@@ -41,7 +43,7 @@ int privio_lines(config_t *cfg, const char **args){
       if (buf[k] == '\n')
         lines++;
 
-  printf("{'%s':%ld}\n", args[0], lines);
+  printf("{'%s':{'lines':%ld,'error':''}}\n", args[0], lines);
 
   if (n == -1)
     privio_debug(cfg, DBG_VERBOSE, "Error reading file %s: %s\n", args[0], strerror(errno));

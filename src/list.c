@@ -27,21 +27,23 @@ int privio_list(config_t *cfg, const char **args){
   struct group *grp;
 
   DIR *dp;
-  char *stat_path = NULL;
+  char *stat_path = NULL, *error_str;
   long name_max, len, item_no = 0;
   int error;
 
   /* TODO: Handle errors */
   dp = opendir(args[0]);
   if (dp == NULL){
-    privio_debug(cfg, DBG_ERROR, "Problem reading %s: %s\n", args[0], strerror(errno));
+    error_str = strerror(errno);
+    printf("{'%s':{'error':'%s'}}\n", error_str);
+    privio_debug(cfg, DBG_ERROR, "Problem reading %s: %s\n", args[0], error_str);
     return -1;
   }
 
   len = dirent_buf_size(dp);
   buf = (struct dirent *)malloc(len);
 
-  printf("{'%s':[", args[0]);
+  printf("{'%s':{[", args[0]);
   name_max = fpathconf(dirfd(dp), _PC_NAME_MAX);
 
   while((error = readdir_r(dp, buf, &dentry)) == 0 && dentry != NULL){
@@ -56,10 +58,10 @@ int privio_list(config_t *cfg, const char **args){
     printf("'%s':{", dentry->d_name);
 
     if (stat(stat_path, &stat_info) == -1){
-      printf("'stat':'%s'}", strerror(errno));
+      printf("'error':'%s'}", strerror(errno));
       continue;
     } else {
-      printf("'stat':'ok',");
+      printf("'error':'',");
     }
 
     switch(stat_info.st_mode & S_IFMT) {
@@ -98,7 +100,7 @@ int privio_list(config_t *cfg, const char **args){
     printf("}");
     free(stat_path);
   }
-  printf("]}\n");
+  printf("],'error':''}}\n");
 
   closedir(dp);
 
