@@ -1,8 +1,7 @@
 chmod
-chown
-chgrp
 chattr
 -cmdhashes.c
++cp
 -lines.c
 -list.c
 -mkdir.c

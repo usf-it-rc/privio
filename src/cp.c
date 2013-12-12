@@ -12,11 +12,12 @@
 #include <fcntl.h>
 
 int _copy_file(const char *, const char *);
-int _mkdir(const char *, const char *);
+int _mkdir(const struct stat *, const char *);
 static int _nftw_copy_callback(const char *, const struct stat *, int, struct FTW *);
+static int _nftw_cp_size_callback(const char *, const struct stat *, int, struct FTW *);
 
 /* declaring these globally should make them accessible to the call-back */
-size_t r_block_size;
+size_t r_block_size, dir_size, tot_written;
 const char *dpath, *base_path;
 config_t *global_cfg;
 
@@ -38,17 +39,33 @@ int privio_cp(config_t *cfg, const char **args){
   cfg_block_size = config_lookup(cfg, "privio.io.reader_block_size");
   r_block_size = config_setting_get_int64(cfg_block_size);
 
-  /* check if source is a file or directory */
-
-  if(nftw(args[0], _nftw_copy_callback, 1, FTW_PHYS) != 0){
+  /* let's get the total size of the source directory */
+  dir_size = 0;
+  if(nftw(args[0], _nftw_cp_size_callback, 1, FTW_PHYS) != 0){
     error_str = strerror(errno);
-    printf("{'%s':{'op':'copy','dest':'%s','error':'%s'}}\n", args[0], args[1], error_str);
+    printf("{'%s':{'status':'init','dest':'%s','error':'%s'}}\n", args[0], args[1], error_str);
     privio_debug(cfg, DBG_ERROR, "Problem traversing directory %s: %s\n", args[0], error_str);
     return -1;
   } else {
-    printf("{'%s':{'op':'copy','dest':'%s','error':''}}\n", args[0], args[1]);
+    printf("{'%s':{'status':'init', 'dest':'%s','error':'','size':%lld}}\n", 
+      args[0], args[1], dir_size);
+  }
+
+  tot_written = 0;
+  if(nftw(args[0], _nftw_copy_callback, 1, FTW_PHYS) != 0){
+    error_str = strerror(errno);
+    printf("{'%s':{'dest':'%s','error':'%s'}}\n", args[0], args[1], error_str);
+    privio_debug(cfg, DBG_ERROR, "Problem traversing directory %s: %s\n", args[0], error_str);
+    return -1;
+  } else {
+    printf("{'%s':{'status':'done','dest':'%s','error':'','copy_size':%lld}}\n", args[0], args[1], tot_written);
     return 0;
   }
+}
+
+static int _nftw_cp_size_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf){
+  dir_size += sb->st_size;
+  return 0;
 }
 
 static int _nftw_copy_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf){
@@ -70,7 +87,7 @@ static int _nftw_copy_callback(const char *fpath, const struct stat *sb, int tfl
   new_path[j] = '\0';
 
   switch(tflag){
-    case FTW_D: return _mkdir(fpath, new_path); break;
+    case FTW_D: return _mkdir(sb, new_path); break;
     case FTW_NS: break;
     case FTW_DNR: break;
     case FTW_F: return _copy_file(fpath, new_path); break;
@@ -79,30 +96,24 @@ static int _nftw_copy_callback(const char *fpath, const struct stat *sb, int tfl
   return 0;
 }
 
-int _mkdir(const char *src_path, const char *new_path){
+int _mkdir(const struct stat *sb, const char *new_path){
   char *error_str;
-  struct stat *sb;
 
-  sb = (struct stat *)malloc(sizeof(struct stat));
-
-  stat(src_path, sb);
-
-  privio_debug(global_cfg, DBG_VERBOSE, "mkdir(%s,%s)\n", src_path, new_path);
+  privio_debug(global_cfg, DBG_VERBOSE, "mkdir(%s)\n", new_path);
 
   if(mkdir(new_path, sb->st_mode) != 0){
-    free(sb);
     error_str = strerror(errno);
     privio_debug(global_cfg, DBG_ERROR, "mkdir(): %s\n", error_str);
     return -1;
   } else {
-    free(sb);
+    tot_written += sb->st_size;
     return 0;
   }
 }
 
 int _copy_file(const char *src_fpath, const char *dst_fpath){
   int src_fdesc, dst_fdesc;
-  size_t n, i;
+  size_t n, i, tot_bytes = 0;
   void *buf;
   char *error_str;
   struct stat *sb;
@@ -138,6 +149,7 @@ int _copy_file(const char *src_fpath, const char *dst_fpath){
     } else {
       privio_debug(global_cfg, DBG_DEBUG3, "Wrote %d blocks to %s\n", i, dst_fpath);
     }
+    tot_bytes += i;
   }
 
   free(buf);
@@ -148,6 +160,9 @@ int _copy_file(const char *src_fpath, const char *dst_fpath){
   if(close(dst_fdesc) == -1){
     privio_debug(global_cfg, DBG_ERROR, "Error closing %s: %s\n", dst_fpath, strerror(errno));
   }
+
+  tot_written += tot_bytes;
+  printf("{'%s':{'status':'copying', 'error':'','file_written':%lld,'written':%lld}}\n", dst_fpath, tot_bytes, tot_written);
 
   return 0;
 }
