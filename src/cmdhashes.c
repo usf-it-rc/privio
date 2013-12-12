@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define CMD_COUNT 14
+#define CMD_COUNT 16
 #define CMD_LENGTH 16
 
 int main(void){
