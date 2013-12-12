@@ -10,7 +10,7 @@ int main(void){
   int i, j;
   char cmds[CMD_COUNT][CMD_LENGTH] = { 
     "write", "read", "zip", "rm", "rename", "cp", "mkdir", "mv",
-    "stat", "mkdir", "lines", "type", "list", "tail" 
+    "stat", "mkdir", "lines", "type", "list", "tail", "chmod", "chattr"
   };
 
   for(i=0; i<CMD_COUNT; i++){
