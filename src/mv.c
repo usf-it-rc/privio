@@ -126,13 +126,23 @@ static int _nftw_move_callback(const char *fpath, const struct stat *sb, int tfl
   switch(tflag){
     case FTW_DP: return _unlink_dir(fpath); break;
     case FTW_F: return _move_file(fpath, new_path); break;
+    case FTW_SL: return _link_file(fpath, new_path); break;
   }
   return 0;
 }
 
 int _unlink_dir(const char *fpath){
   privio_debug(global_cfg, DBG_INFO, "unlink(%s)\n", fpath);
-  return unlink(fpath);
+  return rmdir(fpath);
+}
+
+int _link_file(const char *src_fpath, const char * dst_fpath){
+  /* readlink src_fpath to get link destination */
+
+  /* create symlink */
+
+  /* remove old symlink */
+
 }
 
 int _move_file(const char *src_fpath, const char *dst_fpath){

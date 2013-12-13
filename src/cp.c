@@ -86,6 +86,9 @@ static int _nftw_copy_callback(const char *fpath, const struct stat *sb, int tfl
 
   new_path[j] = '\0';
 
+  if (!strncmp(new_path, dpath, strlen(new_path)))
+    return 0;
+
   switch(tflag){
     case FTW_D: return _mkdir(sb, new_path); break;
     case FTW_NS: break;

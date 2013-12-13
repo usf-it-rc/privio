@@ -5,4 +5,3 @@
 
 /* search and replace... for fucking real? */
 char *strsr(const char *, const char *, const char *);
-int in_array(int *, int, int);

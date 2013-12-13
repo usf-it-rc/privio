@@ -27,9 +27,8 @@ int privio_auth(config_t *cfg, const char *user, const char *auth_token){
     sha_buf[1] = auth_token[i+1];
     sha_buf[2] = '\0';
     at_value[j] = (unsigned char)strtoul(sha_buf, NULL, 16);
-    if (j >= md_len)
+    if (j++ >= md_len)
       return -1;
-    j++;
   }
 
   if (j != md_len)
