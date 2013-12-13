@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 
 set (PRIVIO_OBJS privioUtil.c list.c mkdir.c reader.c writer.c
-lines.c mv.c rename.c type.c zip.c tail.c auth.c cp.c)
+lines.c mv.c rename.c type.c zip.c tail.c auth.c cp.c string.c)
 set (CMDHASH_OBJS cmdhashes.c ${PRIVIO_OBJS})
 
 include_directories("${privio_SOURCE_DIR}/include")

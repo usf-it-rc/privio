@@ -147,7 +147,7 @@ int _copy_file(const char *src_fpath, const char *dst_fpath){
       privio_debug(global_cfg, DBG_DEBUG3, "Error writing %d bytes to %s: %s\n", n, dst_fpath, strerror(errno));
       break;
     } else {
-      privio_debug(global_cfg, DBG_DEBUG3, "Wrote %d blocks to %s\n", i, dst_fpath);
+      privio_debug(global_cfg, DBG_DEBUG3, "Wrote %d bytes to %s\n", i, dst_fpath);
     }
     tot_bytes += i;
   }

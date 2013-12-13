@@ -1,4 +1,5 @@
 #include "privio.h"
+#include "privio_string.h"
 #define _XOPEN_SOURCE 500
 #define __USE_XOPEN_EXTENDED 1
 #include <ftw.h>
@@ -69,6 +70,7 @@ int privio_mv(config_t *cfg, const char **args){
 
   /* let's get the total size of the source directory */
   dir_size = 0;
+  tot_written = 0;
   if(nftw(args[0], _nftw_mv_size_callback, 1, FTW_PHYS) != 0){
     error_str = strerror(errno);
     printf("{'%s':{'status':'init','dest':'%s','error':'%s'}}\n", args[0], args[1], error_str);
@@ -79,7 +81,6 @@ int privio_mv(config_t *cfg, const char **args){
       args[0], args[1], dir_size);
   }
 
-  tot_written = 0;
   if(nftw(args[0], _nftw_move_callback, 1, FTW_PHYS|FTW_DEPTH) != 0){
     error_str = strerror(errno);
     printf("{'%s':{'dest':'%s','error':'%s'}}\n", args[0], args[1], error_str);
@@ -92,56 +93,46 @@ int privio_mv(config_t *cfg, const char **args){
 }
 
 static int _nftw_mv_size_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf){
+  char *error_str, *npath;
+
+  /* we need to create our directory tree when walking forward */
+  if(sb->st_mode & S_IFDIR){
+
+    npath = strsr(fpath, base_path, dpath);
+
+    if(mkdir(npath, sb->st_mode) == -1){
+      error_str = strerror(errno);
+      privio_debug(global_cfg, DBG_ERROR, "Couldn't make destination directory %s: %s\n", npath, error_str);
+      printf("{'%s':{'mkdstdir':'','error':'%s'}}\n", npath, error_str);
+      free(npath);
+      return -1;
+    } else {
+      printf("{'%s':{'mkdstdir':'','error':''}}\n", npath, error_str);
+      free(npath);
+    }
+  }
+
   dir_size += sb->st_size;
+  tot_written += sb->st_size;
   return 0;
 }
 
 static int _nftw_move_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf){
-
-  ssize_t new_path_len = strlen(dpath) + (strlen(fpath) - strlen(base_path));
-  int i,j;
   char *new_path;
+  new_path = strsr(fpath, base_path, dpath);
 
-  new_path = (char*)malloc((new_path_len*sizeof(char))+1);
-  new_path = (char*)memset(new_path, 0, new_path_len+1);
-
-  /* substitute old base path with new base path */
-  strncpy(new_path, dpath, strlen(dpath));
-
-  j = strlen(dpath);
-  for (i = strlen(base_path); i < strlen(fpath); i++)
-    new_path[j++] = fpath[i];
-
-  new_path[j] = '\0';
+  privio_debug(global_cfg, DBG_INFO, "new_path => %s\n", new_path);
 
   switch(tflag){
-    case FTW_D: return _mvdir(sb, fpath, new_path); break;
-    case FTW_NS: break;
-    case FTW_DNR: break;
+    case FTW_DP: return _unlink_dir(fpath); break;
     case FTW_F: return _move_file(fpath, new_path); break;
-    case FTW_SL: break;
   }
   return 0;
 }
 
-/* TODO: Change nftw traversal order OR build up directory paths recursively? */
-int _mvdir(const struct stat *sb, const char *old_path, const char *new_path){
-  char *error_str;
-
-  privio_debug(global_cfg, DBG_VERBOSE, "mvdir(%s)\n", new_path);
-
-  if(mkdir(new_path, sb->st_mode) != 0){
-    error_str = strerror(errno);
-    privio_debug(global_cfg, DBG_ERROR, "mkdir(): %s\n", error_str);
-    return -1;
-  } else {
-    if(unlink(old_path) == -1){
-      privio_debug(global_cfg, DBG_ERROR, "Error unlinking %s: %s\n", old_path, strerror(errno));
-      return -1;
-    }
-    tot_written += sb->st_size;
-    return 0;
-  }
+int _unlink_dir(const char *fpath){
+  privio_debug(global_cfg, DBG_INFO, "unlink(%s)\n", fpath);
+  return unlink(fpath);
 }
 
 int _move_file(const char *src_fpath, const char *dst_fpath){
