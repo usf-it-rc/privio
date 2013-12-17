@@ -144,7 +144,6 @@ int privioPathValidator(config_t *cfg, char *path){
     }
   }
 
-  free(regs);
   return -1;  
 }
 

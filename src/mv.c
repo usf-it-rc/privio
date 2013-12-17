@@ -13,11 +13,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <omp.h>
 
 int _move_file(const char *, const char *);
 int _mvdir(const struct stat *, const char *, const char *);
 static int _nftw_move_callback(const char *, const struct stat *, int, struct FTW *);
 static int _nftw_mv_size_callback(const char *, const struct stat *, int, struct FTW *);
+char *_readlink_malloc(const char *);
 
 /* declaring these globally should make them accessible to the call-back */
 size_t r_block_size, dir_size, tot_written;
@@ -28,6 +30,7 @@ int privio_mv(config_t *cfg, const char **args){
   char *error_str, *dst_path; 
   struct stat sb_src, sb_dst;
   config_setting_t *cfg_block_size;
+  int worker_status = 0;
 
   global_cfg = cfg;
 
@@ -71,24 +74,37 @@ int privio_mv(config_t *cfg, const char **args){
   /* let's get the total size of the source directory */
   dir_size = 0;
   tot_written = 0;
-  if(nftw(args[0], _nftw_mv_size_callback, 1, FTW_PHYS) != 0){
-    error_str = strerror(errno);
-    printf("{'%s':{'status':'init','dest':'%s','error':'%s'}}\n", args[0], args[1], error_str);
-    privio_debug(cfg, DBG_ERROR, "Problem traversing directory %s: %s\n", args[0], error_str);
-    return -1;
-  } else {
-    printf("{'%s':{'status':'init', 'dest':'%s','error':'','size':%lld}}\n", 
-      args[0], args[1], dir_size);
-  }
 
-  if(nftw(args[0], _nftw_move_callback, 1, FTW_PHYS|FTW_DEPTH) != 0){
-    error_str = strerror(errno);
-    printf("{'%s':{'dest':'%s','error':'%s'}}\n", args[0], args[1], error_str);
-    privio_debug(cfg, DBG_ERROR, "Problem traversing directory %s: %s\n", args[0], error_str);
-    return -1;
-  } else {
-    printf("{'%s':{'status':'done','dest':'%s','error':'','move_size':%lld}}\n", args[0], args[1], tot_written);
-    return 0;
+#pragma omp parallel sections shared(tot_written, worker_status)
+  {
+
+#pragma omp section
+    {
+      if(nftw(args[0], _nftw_mv_size_callback, 1, FTW_PHYS) != 0){
+        error_str = strerror(errno);
+        privio_debug(cfg, DBG_ERROR, "Problem traversing directory %s: %s\n", args[0], error_str);
+        worker_status = 1;
+      }
+
+      if (worker_status == 0){
+        if((nftw(args[0], _nftw_move_callback, 1, FTW_PHYS|FTW_DEPTH) != 0)){
+          error_str = strerror(errno);
+          privio_debug(cfg, DBG_ERROR, "Problem traversing directory %s: %s\n", args[0], error_str);
+        }
+      }
+      worker_status = 1;
+    }
+#pragma omp section
+    {
+      while (1){
+        if (worker_status == 0)
+          printf("{'%s':{'written':%lld}}\n", dpath, tot_written);
+        else
+          break;
+
+        sleep(1);
+      }
+    }
   }
 }
 
@@ -106,10 +122,8 @@ static int _nftw_mv_size_callback(const char *fpath, const struct stat *sb, int 
       printf("{'%s':{'mkdstdir':'','error':'%s'}}\n", npath, error_str);
       free(npath);
       return -1;
-    } else {
-      printf("{'%s':{'mkdstdir':'','error':''}}\n", npath, error_str);
-      free(npath);
     }
+    free(npath);
   }
 
   dir_size += sb->st_size;
@@ -119,16 +133,18 @@ static int _nftw_mv_size_callback(const char *fpath, const struct stat *sb, int 
 
 static int _nftw_move_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf){
   char *new_path;
+  int retval = 0;
+
   new_path = strsr(fpath, base_path, dpath);
 
-  privio_debug(global_cfg, DBG_INFO, "new_path => %s\n", new_path);
-
   switch(tflag){
-    case FTW_DP: return _unlink_dir(fpath); break;
-    case FTW_F: return _move_file(fpath, new_path); break;
-    case FTW_SL: return _link_file(fpath, new_path); break;
+    case FTW_DP: retval = _unlink_dir(fpath); break;
+    case FTW_F: retval = _move_file(fpath, new_path); break;
+    case FTW_SL: retval = _link_file(fpath, new_path); break;
   }
-  return 0;
+
+  free(new_path);
+  return retval;
 }
 
 int _unlink_dir(const char *fpath){
@@ -137,12 +153,28 @@ int _unlink_dir(const char *fpath){
 }
 
 int _link_file(const char *src_fpath, const char * dst_fpath){
+  int ret_rl, ret_sl, ret_ul;
+  char *buf;
+
   /* readlink src_fpath to get link destination */
+  if ((buf = _readlink_malloc(src_fpath)) == NULL){
+    privio_debug(global_cfg, DBG_ERROR, "Problem reading link information for %s\n", src_fpath);
+    return -1;
+  }
 
   /* create symlink */
+  if (symlink(buf, dst_fpath) != 0){
+    privio_debug(global_cfg, DBG_ERROR, "Problem creating symlink %s: %s\n", dst_fpath, strerror(errno));
+    return -1;
+  }
+
+  free(buf);
 
   /* remove old symlink */
-
+  if (unlink(src_fpath) != 0){
+    privio_debug(global_cfg, DBG_ERROR, "Problem removing symlink %s: %s\n", src_fpath, strerror(errno));
+    return -1;
+  }
 }
 
 int _move_file(const char *src_fpath, const char *dst_fpath){
@@ -201,7 +233,26 @@ int _move_file(const char *src_fpath, const char *dst_fpath){
   }
 
   tot_written += tot_bytes;
-  printf("{'%s':{'status':'moving', 'error':'','file_written':%lld,'written':%lld}}\n", dst_fpath, tot_bytes, tot_written);
 
   return 0;
+}
+
+/* TODO: This code needs to be fixed... the returned string is not null-terminated */
+char *_readlink_malloc (const char *filename){
+  int size = 100;
+  char *buffer = NULL;
+          
+  while (1){
+    buffer = (char *) realloc(buffer, size);
+    int nchars = readlink (filename, buffer, size);
+
+    if (nchars < 0){
+      free (buffer);
+      return NULL;
+    }
+    if (nchars < size)
+      return buffer;
+
+    size *= 2;
+  }
 }
