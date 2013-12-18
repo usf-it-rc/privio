@@ -25,7 +25,7 @@ static int _nftw_size_callback(const char *, const struct stat *, int, struct FT
 char *_readlink_malloc(const char *);
 
 /* declaring these globally should make them accessible to the call-back */
-size_t r_block_size, dir_size, tot_written;
+size_t r_block_size, dir_size = 0, tot_written = 0;
 int op_mode;
 char *dpath, *base_path;
 config_t *global_cfg;
@@ -58,22 +58,16 @@ int _privio_mvcp(config_t *cfg, const char **args, int mode){
   base_path = (char*)args[0];
   stat(base_path, &sb_src);
 
-  /* construct our new path destination */
-  if (sb_src.st_mode&S_IFDIR){
-    dst_path = (char *)malloc(strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
-    dst_path = (char *)memset(dst_path, 0, strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
+  dst_path = (char *)malloc(strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
+  dst_path = (char *)memset(dst_path, 0, strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
 
-    strncpy(dst_path, args[1], strlen(args[1]));
-    strcat(dst_path, "/");
-    strcat(dst_path, basename(base_path));
+  strncpy(dst_path, args[1], strlen(args[1]));
+  strcat(dst_path, "/");
+  strcat(dst_path, basename(base_path));
 
-    dpath = dst_path;
-  } else {
-    dpath = (char*)args[1];
-  }
+  dpath = dst_path;
 
   /* we shold probably error check this */
-  stat(base_path, &sb_src);
   stat(args[1], &sb_dst);
 
   /* If this is true, a simple rename will suffice :) */
@@ -92,10 +86,6 @@ int _privio_mvcp(config_t *cfg, const char **args, int mode){
   /* read size */
   cfg_block_size = config_lookup(cfg, "privio.io.reader_block_size");
   r_block_size = config_setting_get_int64(cfg_block_size);
-
-  /* let's get the total size of the source directory */
-  dir_size = 0;
-  tot_written = 0;
 
   /* we should only ever need 2 threads for this */
   omp_set_num_threads(2);
@@ -131,7 +121,7 @@ int _privio_mvcp(config_t *cfg, const char **args, int mode){
 #pragma omp section
     {
       int local_ws, loop_status = 0;
-      size_t local_tw, local_ds;
+      size_t local_tw = 0, local_ds = 0;
       while (!loop_status){
         /* grab the worker status */
         omp_set_lock(&worker_status_lock);
@@ -150,13 +140,13 @@ int _privio_mvcp(config_t *cfg, const char **args, int mode){
 
         switch(local_ws){
           case 0: 
-            printf("{'%s':{'status':'in_progress','progress':'%d\%'}}\n", dpath, 
-              (int)(((double)local_tw/(double)local_ds)*(double)100));
+            printf("{'%s':{'status':'in_progress','size':%lld,'written':%lld,'progress':'%d\%'}}\n", dpath, 
+              local_ds, local_tw, local_ds ? (int)(((double)local_tw/(double)local_ds)*(double)100) : 0);
             sleep(1);
             break;
           case 1:
-            printf("{'%s':{'status':'complete','progress':'%d\%'}}\n", dpath, 
-              (int)(((double)local_tw/(double)local_ds)*(double)100));
+            printf("{'%s':{'status':'complete','size':%lld,'written':%lld,'progress':'%d\%'}}\n", dpath, 
+              local_ds, local_tw, local_ds ? (int)(((double)local_tw/(double)local_ds)*(double)100) : 0);
             loop_status = 1;
             break;
           case 2:
