@@ -1,3 +1,21 @@
+/*
+ * privio_auth
+ *
+ * this function takes the switch-to user and an auth token.  The
+ * configured secret key and the provided switch-to user when hashed
+ * via sha512 together, should equal the hash provided by 
+ * the upper-level APIs, in order to establish some very basic
+ * authentication.  This means that your API (presumably used by 
+ * a web application) knows the shared key configured by the
+ * system administrator and can provide the valid hash based on that
+ * key in order to execute these privileged operations... This is
+ * ON TOP of the configuration directives in the privio.conf file
+ * that determine:
+ * 
+ * a) effective uid ALLOWED to execute privio
+ * b) uid's that the allowed euid is permitted to switch to
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <openssl/evp.h>
@@ -14,6 +32,8 @@ int privio_auth(config_t *cfg, const char *user, const char *auth_token){
   sec_key_setting = config_lookup(cfg, "privio.secret_key");
   secret_key = (char*)config_setting_get_string(sec_key_setting);
 
+  /* The openssl docs say to use the EVP_* functions, for
+   * forward-compatibility... who am i to disagree? */
   mdctx = EVP_MD_CTX_create();
   EVP_DigestInit_ex(mdctx, EVP_sha512(), NULL);
   EVP_DigestUpdate(mdctx, user, strlen(user));
@@ -21,6 +41,8 @@ int privio_auth(config_t *cfg, const char *user, const char *auth_token){
   EVP_DigestFinal_ex(mdctx, md_value, &md_len);
   EVP_MD_CTX_destroy(mdctx);
 
+  /* convert our char-based key into a bit field for
+   * easy comparison */
   j = 0;
   for (i = 0; i < strlen(auth_token); i+=2){
     sha_buf[0] = auth_token[i];

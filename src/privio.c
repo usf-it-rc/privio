@@ -101,6 +101,9 @@ int main(int argc, char *argv[]){
   }
 
   for (i = 4; i < argc; i++){
+    /* We need a signed integer as a second argument for tail, so stop after the first arg */
+    if ((i > 4) && cmdHash(argv[3]) == CMD_TAIL)
+      break;
     if(privioPathValidator(&cfg, argv[i])){
       privio_debug(&cfg, DBG_ERROR, "Path %s is not allowed!\n", argv[i]);
       return 2;

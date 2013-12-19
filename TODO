@@ -11,7 +11,7 @@ chattr
 -reader.c
 -rename.c
 -rm.c
-tail.c
+-tail.c
 -type.c
 -writer.c
 zip.c
