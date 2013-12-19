@@ -17,10 +17,12 @@
 
 #define MODE_COPY 1
 #define MODE_MOVE 2
+#define MODE_RM 3
 
-int _copy_move_file(const char *, const char *);
+int _unlink_dir(const char *, const struct stat *);
+int _copy_move_remove_file(const char *, const char *);
 int _link_file(const struct stat *, const char *, const char *);
-static int _nftw_cpmv_callback(const char *, const struct stat *, int, struct FTW *);
+static int _nftw_cpmvrm_callback(const char *, const struct stat *, int, struct FTW *);
 static int _nftw_size_callback(const char *, const struct stat *, int, struct FTW *);
 char *_readlink_malloc(const char *);
 
@@ -39,6 +41,10 @@ int privio_cp(config_t *cfg, const char **args){
   return _privio_mvcp(cfg, args, MODE_COPY);
 }
 
+int privio_rm(config_t *cfg, const char **args){
+  return _privio_mvcp(cfg, args, MODE_RM);
+}
+
 
 int _privio_mvcp(config_t *cfg, const char **args, int mode){
   char *error_str, *dst_path; 
@@ -50,28 +56,28 @@ int _privio_mvcp(config_t *cfg, const char **args, int mode){
   op_mode = mode;
   global_cfg = cfg;
 
-  if (args[0] == NULL || args[1] == NULL){
-    privio_debug(cfg, DBG_ERROR, "Not enough arguments for a move!\n");
+  if (args[0] == NULL || (op_mode == MODE_RM ? 0 : args[1] == NULL)){
+    privio_debug(cfg, DBG_ERROR, "Not enough arguments for a rm!\n");
     return 2;
   }
 
   base_path = (char*)args[0];
   stat(base_path, &sb_src);
 
-  dst_path = (char *)malloc(strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
-  dst_path = (char *)memset(dst_path, 0, strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
+  if (op_mode != MODE_RM){
+    dst_path = (char *)malloc(strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
+    dst_path = (char *)memset(dst_path, 0, strlen(args[1])*sizeof(char)+pathconf(args[1], _PC_NAME_MAX)+1);
 
-  strncpy(dst_path, args[1], strlen(args[1]));
-  strcat(dst_path, "/");
-  strcat(dst_path, basename(base_path));
+    strncpy(dst_path, args[1], strlen(args[1]));
+    strcat(dst_path, "/");
+    strcat(dst_path, basename(base_path));
 
-  dpath = dst_path;
-
-  /* we shold probably error check this */
-  stat(args[1], &sb_dst);
+    dpath = dst_path;
+    stat(args[1], &sb_dst);
+  }
 
   /* If this is true, a simple rename will suffice :) */
-  if ((sb_dst.st_dev == sb_src.st_dev) && mode == MODE_MOVE){
+  if (op_mode != MODE_RM && ((sb_dst.st_dev == sb_src.st_dev) && mode == MODE_MOVE)){
     if (rename(base_path, dst_path) != 0){
       error_str = strerror(errno);
       printf("{'%s':{'new_name':'','error':'%s'}}\n", base_path, error_str);
@@ -107,8 +113,8 @@ int _privio_mvcp(config_t *cfg, const char **args, int mode){
       }
 
       if (worker_status == 0){
-        if((ret_val = nftw(base_path, _nftw_cpmv_callback, 1, 
-            op_mode == MODE_MOVE ? FTW_PHYS|FTW_DEPTH : FTW_PHYS)) == -1){
+        if((ret_val = nftw(base_path, _nftw_cpmvrm_callback, 1, 
+            (op_mode == MODE_MOVE||op_mode == MODE_RM) ? FTW_PHYS|FTW_DEPTH : FTW_PHYS)) == -1){
           error_str = strerror(errno);
           privio_debug(cfg, DBG_ERROR, "Problem %sing directory %s: %s\n", op_mode == MODE_MOVE ? "move" : "copy", 
             base_path, error_str);
@@ -140,17 +146,19 @@ int _privio_mvcp(config_t *cfg, const char **args, int mode){
 
         switch(local_ws){
           case 0: 
-            printf("{'%s':{'status':'in_progress','size':%lld,'written':%lld,'progress':'%d\%'}}\n", dpath, 
+            printf("{'%s':{'status':'in_progress','size':%lld,'written':%lld,'progress':'%d\%'}}\n", 
+              op_mode == MODE_RM ? base_path : dpath, 
               local_ds, local_tw, local_ds ? (int)(((double)local_tw/(double)local_ds)*(double)100) : 0);
             sleep(1);
             break;
           case 1:
-            printf("{'%s':{'status':'complete','size':%lld,'written':%lld,'progress':'%d\%'}}\n", dpath, 
+            printf("{'%s':{'status':'complete','size':%lld,'written':%lld,'progress':'%d\%'}}\n",
+              op_mode == MODE_RM ? base_path : dpath, 
               local_ds, local_tw, local_ds ? (int)(((double)local_tw/(double)local_ds)*(double)100) : 0);
             loop_status = 1;
             break;
           case 2:
-            printf("{'%s':{'status':'initializing'}}\n", dpath);
+            printf("{'%s':{'status':'initializing'}}\n", op_mode == MODE_RM ? base_path : dpath);
             break;
           default: loop_status = 1;
         }
@@ -164,7 +172,7 @@ static int _nftw_size_callback(const char *fpath, const struct stat *sb, int tfl
   char *error_str, *npath;
 
   /* we need to create our directory tree when walking forward */
-  if(sb->st_mode & S_IFDIR){
+  if(op_mode != MODE_RM && sb->st_mode & S_IFDIR){
     npath = strsr(fpath, base_path, dpath);
     if(mkdir(npath, sb->st_mode) == -1){
       error_str = strerror(errno);
@@ -187,54 +195,63 @@ static int _nftw_size_callback(const char *fpath, const struct stat *sb, int tfl
   return 0;
 }
 
-static int _nftw_cpmv_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf){
+static int _nftw_cpmvrm_callback(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf){
   char *new_path;
   int retval = 0;
 
-  new_path = strsr(fpath, base_path, dpath);
+  if (op_mode != MODE_RM)
+    new_path = strsr(fpath, base_path, dpath);
+  else
+    new_path = NULL;
 
   switch(tflag){
-    case FTW_D:   retval = _unlink_dir(fpath); break;
-    case FTW_DP:  retval = _unlink_dir(fpath); break;
-    case FTW_F:   retval = _copy_move_file(fpath, new_path); break;
+    case FTW_D:   retval = _unlink_dir(fpath, sb); break;
+    case FTW_DP:  retval = _unlink_dir(fpath, sb); break;
+    case FTW_F:   retval = _copy_move_remove_file(fpath, new_path); break;
     case FTW_SL:  retval = _link_file(sb, fpath, new_path); break;
     default:      privio_debug(global_cfg, DBG_ERROR, "No handler for file %s!\n", fpath);
   }
 
   free(new_path);
-  privio_debug(global_cfg, DBG_DEBUG3, "_nftw_cpmv_callback() for %s => %d\n", fpath, retval);
+  privio_debug(global_cfg, DBG_DEBUG3, "_nftw_cpmvrm_callback() for %s => %d\n", fpath, retval);
   return retval;
 }
 
-int _unlink_dir(const char *fpath){
+int _unlink_dir(const char *fpath, const struct stat *sb){
+  if (op_mode == MODE_RM){
+    omp_set_lock(&tot_written_lock);
+    tot_written += sb->st_size;
+    omp_unset_lock(&tot_written_lock);
+  }
   privio_debug(global_cfg, DBG_INFO, "unlink(%s)\n", fpath);
-  return op_mode == MODE_MOVE ? rmdir(fpath) : 0;
+  return (op_mode == MODE_MOVE || op_mode == MODE_RM) ? rmdir(fpath) : 0;
 }
 
 int _link_file(const struct stat *sb, const char *src_fpath, const char * dst_fpath){
   int ret_rl, ret_sl, ret_ul;
   char *buf;
 
-  /* readlink src_fpath to get link destination */
-  if ((buf = _readlink_malloc(src_fpath)) == NULL){
-    privio_debug(global_cfg, DBG_ERROR, "Problem reading link information for %s\n", src_fpath);
-    return -1;
-  }
+  if (op_mode != MODE_RM){
+    /* readlink src_fpath to get link destination */
+    if ((buf = _readlink_malloc(src_fpath)) == NULL){
+      privio_debug(global_cfg, DBG_ERROR, "Problem reading link information for %s\n", src_fpath);
+      return -1;
+    }
 
-  /* create symlink */
-  if (symlink(buf, dst_fpath) != 0){
-    privio_debug(global_cfg, DBG_ERROR, "Problem creating symlink %s: %s\n", dst_fpath, strerror(errno));
-    return -1;
+    /* create symlink */
+    if (symlink(buf, dst_fpath) != 0){
+      privio_debug(global_cfg, DBG_ERROR, "Problem creating symlink %s: %s\n", dst_fpath, strerror(errno));
+      return -1;
+    }
+    free(buf);
   }
 
   omp_set_lock(&tot_written_lock);
   tot_written += sb->st_size;
   omp_unset_lock(&tot_written_lock);
 
-  free(buf);
-
   /* remove old symlink */
-  if (op_mode == MODE_MOVE){
+  if (op_mode == MODE_MOVE || op_mode == MODE_RM){
     if (unlink(src_fpath) != 0){
       privio_debug(global_cfg, DBG_ERROR, "Problem removing symlink %s: %s\n", src_fpath, strerror(errno));
       return -1;
@@ -243,14 +260,30 @@ int _link_file(const struct stat *sb, const char *src_fpath, const char * dst_fp
   return 0;
 }
 
-int _copy_move_file(const char *src_fpath, const char *dst_fpath){
+int _copy_move_remove_file(const char *src_fpath, const char *dst_fpath){
   int src_fdesc, dst_fdesc;
   size_t n, i;
   void *buf;
   char *error_str;
   struct stat *sb;
 
-  privio_debug(global_cfg, DBG_VERBOSE, "_copy_move_file(%s,%s)\n", src_fpath, dst_fpath);
+  privio_debug(global_cfg, DBG_VERBOSE, "_copy_move_remove_file(%s,%s)\n", src_fpath, dst_fpath);
+
+  if (op_mode == MODE_RM){
+    sb = (struct stat*)malloc(sizeof(struct stat));
+    stat(src_fpath, sb);
+    if (unlink(src_fpath) == -1){
+      error_str = strerror(errno);
+      privio_debug(global_cfg, DBG_ERROR, "Cannot open source file %s: %s\n", src_fpath, error_str);
+      free(sb);
+      return -1;
+    }
+    omp_set_lock(&tot_written_lock);
+    tot_written += (size_t)sb->st_size;
+    omp_unset_lock(&tot_written_lock);
+    free(sb);
+    return 0;
+  }
 
   src_fdesc = open(src_fpath, O_RDONLY);
   if (src_fdesc == -1){

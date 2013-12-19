@@ -180,6 +180,7 @@ privioFunction getOpFromCommand(config_t *cfg, const char *cmd){
     case CMD_LIST:    fpointer = &privio_list; break;
     case CMD_TAIL :   fpointer = &privio_tail; break;
     case CMD_CP :     fpointer = &privio_cp; break;
+    case CMD_RM :     fpointer = &privio_rm; break;
     default: privio_debug(cfg, DBG_INFO, "Invalid command specified!\n"); return NULL;
   }
 
