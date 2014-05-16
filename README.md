@@ -1,6 +1,6 @@
 # privio... 
 
-A tool for providing privileged file access to a trusted user.  This allows for things like web applications who's users map to POSIX users to manipulate files and directories beloging to said user.  
+A tool for providing privileged file access to a trusted user.  This allows for things like web applications whose users map to POSIX users so that it can manipulate files and directories belonging to said user.  
 
 An example would be a web-based file manager in PHP or Rails or your framework of choice, where a user can login via their LDAP, SSO, etc. credentials and modify their own files via the web interface.
 
@@ -8,7 +8,7 @@ The goal of privio is to be as secure as possible while providing the flexibilit
 
 ## Usage
 
-privio should be setuid root (like sudo) and placed in an accessible path.  I will be implementing upper-level APIs for frameworks like Rails & Jango and possibly a PHP library.
+privio should be setuid root (like sudo) and placed in an accessible path.  I will be implementing upper-level APIs for frameworks like Rails & Django and possibly a PHP library.
 
 The examples below assume that a user, let's say 'rails', will be calling privio and switching between users for lower-level file access.
 
@@ -20,4 +20,4 @@ As your web app user (say, 'rails')
 
 This allowed the rails user to write the contents of 'some_file' to /home/jdoe/new_file, as the user 'jdoe'.
 
-All operations will display JSON-formatted result strings with the exception of the streaming operations, read, write, and zip.  The resultant stream will be the file contents, a write handle, and a stream of the zip encoded conent of a directory.
+All operations will display JSON-formatted result strings with the exception of the streaming operations, read, write, and zip.  The resultant stream will be the file contents, a write handle, and a stream of the zip-encoded content of a directory.
